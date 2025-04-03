@@ -328,8 +328,6 @@ print(f'\nCO SEASON: \n')
 
 co_df['ff_brand_cluster'] = np.where(co_df['brand'].str.lower in ['balenciaga', 'saint laurent', 'gucci', 'bottega veneta', 'max mara', 'the row'], 'reduced', 'normal')
 
-co_df = co_df.loc[((co_df['co_status'] != 'Existing CO') & (co_df['co_status'] != 'New CO')) | (co_df['coverage'] > 56)]
-
 # If the price of previous week is lower, use that one
 co_df = pd.merge(co_df, archive_tm, how='left', left_on='sku', right_on='sku').reset_index(drop=True)
 co_df['pb_im_arc'].fillna(100000, inplace=True)
@@ -356,7 +354,8 @@ co_df['availability'] = (co_df['stock_qty_lm']*30 + co_df['received_lm'] * (co_d
 co_df['sales_velocity'] = co_df['sold_lm'] / co_df['availability']
 co_df['coverage'] = co_df['available_qty'] / co_df['sales_velocity'] / 7
 
-co_df = co_df.loc[((co_df['calculation_date'] - co_df['publishing_date']).dt.days > 14)]
+co_df = co_df.loc[(co_df['calculation_date'] - co_df['publishing_date']).dt.days > 14]
+co_df = co_df.loc[((co_df['co_status'] != 'Existing CO') & (co_df['co_status'] != 'New CO')) | (co_df['coverage'] > 56)]
 # print(co_df)
 
 tm_reduction_cond_co = [(co_df['co_status'] == 'Existing CO') & (co_df['available_qty'] > 2) & (co_df['coverage'] > 56), #Existing CO
