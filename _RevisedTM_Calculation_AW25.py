@@ -468,6 +468,9 @@ all_df = all_df.loc[all_df['pb_im'] > 0].reset_index(drop=True)
 all_df = all_df[['sku', 'brand', 'season', 'last_season', 'season_group', 'co_status', 'pb_row1', 'pb_im', 'actual_gm_im', 'available_qty', 'eur_cost_price', 'stock_on_hand', 
                  'actual_st', 'coverage', 'max_reduction', 'revised_tm', 'tm_diff', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1', 'new_pb_FF', 'new_pb_FFGB', 'im_change']]
 
+group_cond = [all_df['season_group'] == '1. Carry-Overs', (all_df['season'] == new_season) | (all_df['season'] == current_season)]
+all_df['calculation_group'] = np.select(group_cond, [all_df['co_status'], all_df['season']], default='old')
+
 def create_excel (writer:pd.ExcelWriter, df:pd.DataFrame, sheetname:str='Sheet1', index=True):
     df.style.set_properties(**{'text-align': 'left'}).to_excel(writer, sheet_name=sheetname, index=index, float_format='%.2f')
     for column in df:
@@ -477,8 +480,8 @@ def create_excel (writer:pd.ExcelWriter, df:pd.DataFrame, sheetname:str='Sheet1'
 
 print('* Detailed output')
 with pd.ExcelWriter(currentlocation + '\\x_RevisedTM_ALL_' + calc_date + '.xlsx') as writer:
-    create_excel(writer, new_df, 'SS25', index=False)
-    create_excel(writer, current_df, 'AW24', index=False)
+    create_excel(writer, new_df, 'AW25', index=False)
+    create_excel(writer, current_df, 'SS25', index=False)
     create_excel(writer, co_df, 'CO', index=False)
     create_excel(writer, old_df, 'OLD', index=False)
     create_excel(writer, ab_df_prices, 'AB', index=False)
@@ -486,8 +489,8 @@ with pd.ExcelWriter(currentlocation + '\\x_RevisedTM_ALL_' + calc_date + '.xlsx'
 print('* Summaries')
 with pd.ExcelWriter(currentlocation + '\\x_RevisedTM_Summary_' + calc_date + '.xlsx') as writer:
     create_excel(writer, all_df, 'ALL', index=False)
-    create_excel(writer, new_summary, 'SS25', index=False)
-    create_excel(writer, current_summary, 'AW24', index=False)
+    create_excel(writer, new_summary, 'AW25', index=False)
+    create_excel(writer, current_summary, 'SS25', index=False)
     create_excel(writer, co_summary, 'CO', index=False)
     create_excel(writer, old_summary, 'OLD', index=False)
     create_excel(writer, ab_summary, 'AB', index=False)
