@@ -465,7 +465,7 @@ archive_df.to_excel(currentlocation + '\\ArchivePrices_' + calc_date + '.xlsx', 
 
 all_df = pd.concat([new_summary, current_summary, co_summary, old_summary])
 all_df = all_df.loc[all_df['pb_im'] > 0].reset_index(drop=True)
-all_df = all_df[['sku', 'brand', 'season', 'season_group', 'co_status', 'pb_row1', 'pb_im', 'actual_gm_im', 'available_qty', 'eur_cost_price', 'stock_on_hand', 
+all_df = all_df[['sku', 'brand', 'season', 'last_season', 'season_group', 'co_status', 'pb_row1', 'pb_im', 'actual_gm_im', 'available_qty', 'eur_cost_price', 'stock_on_hand', 
                  'actual_st', 'coverage', 'max_reduction', 'revised_tm', 'tm_diff', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1', 'new_pb_FF', 'new_pb_FFGB', 'im_change']]
 
 def create_excel (writer:pd.ExcelWriter, df:pd.DataFrame, sheetname:str='Sheet1', index=True):
