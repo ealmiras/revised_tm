@@ -13,8 +13,8 @@ pd.options.mode.chained_assignment = None
 ## GENERAL INFORMATION -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 currentlocation = str(pathlib.Path(__file__).parent.absolute())[:-7]
 
-calc_date = '2025-04-03'
-arc_date = '2025-03-17'
+calc_date = '2025-04-17'
+arc_date = '2025-04-03'
 
 current_season = 'SS25'
 current_eos_date = '2025-05-01'
@@ -144,7 +144,7 @@ new_season_groups = [(new_df['season_group'] == '3. Seasonal'),
                      (new_df['season_group'] == '2. Seasonal no MD')]
 new_eos_st_goals = [0.6, 0.55]
 eos_tms = [0, 0.1]
-tm_reduction_caps = [0.1, 0.05]
+tm_reduction_caps = [0.05, 0.05]
 
 new_df['eos_st_goal'] = np.select(new_season_groups, new_eos_st_goals, default=np.nan)
 new_df['eos_tm'] = np.select(new_season_groups, eos_tms, default=eos_tms[1])
@@ -210,9 +210,9 @@ print(f'\nCURRENT SEASON: \n')
 
 current_season_groups = [(current_df['season_group'] == '3. Seasonal'), 
                          (current_df['season_group'] == '2. Seasonal no MD')]
-new_eos_st_goals = [0.65, 0.60]
-eos_tms = [0, 0.05]
-tm_reduction_caps = [0.1, 0.05]
+new_eos_st_goals = [0.70, 0.65]
+eos_tms = [-0.05, 0.05]
+tm_reduction_caps = [0.1, 0.1]
 
 current_df['eos_st_goal'] = np.select(current_season_groups, new_eos_st_goals, default=np.nan)
 current_df['eos_tm'] = np.select(current_season_groups, eos_tms, default=eos_tms[1])
@@ -328,6 +328,9 @@ print(f'\nCO SEASON: \n')
 
 co_df['ff_brand_cluster'] = np.where(co_df['brand'].str.lower in ['balenciaga', 'saint laurent', 'gucci', 'bottega veneta', 'max mara', 'the row'], 'reduced', 'normal')
 
+co_df['publishing_date'] = pd.to_datetime(co_df['publishing_date'], format="%Y-%m-%d")
+co_df['calculation_date'] = pd.to_datetime(calc_date, format="%Y-%m-%d")
+
 # If the price of previous week is lower, use that one
 co_df = pd.merge(co_df, archive_tm, how='left', left_on='sku', right_on='sku').reset_index(drop=True)
 co_df['pb_im_arc'].fillna(100000, inplace=True)
@@ -340,11 +343,8 @@ co_df['returned_lm'].fillna(0, inplace=True)
 co_df['sold_lm'].fillna(0, inplace=True)
 co_df['avg_ops_date'].fillna(0, inplace=True)
 co_df['avg_ops_date'] = pd.to_datetime(co_df['avg_ops_date'])
-co_df['publishing_date'] = pd.to_datetime(co_df['publishing_date'], format="%Y-%m-%d")
 co_df['stock_on_hand'] = co_df['available_qty'] * co_df['eur_cost_price']
-co_df['calculation_date'] = pd.to_datetime(calc_date, format="%Y-%m-%d")
 co_df['current_eos_date'] = pd.to_datetime(current_eos_date, format="%Y-%m-%d")
-co_df = co_df.loc[co_df['publishing_date'] < co_df['calculation_date']]
 co_df['actual_gm_im'] = 1 - co_df['eur_cost_price'] / co_df['pb_im']
 
 co_df['actual_st'] = co_df['net_whs_value'] / (co_df['stock_on_hand'] - co_df['net_whs_value']) *-1
@@ -354,8 +354,10 @@ co_df['availability'] = (co_df['stock_qty_lm']*30 + co_df['received_lm'] * (co_d
 co_df['sales_velocity'] = co_df['sold_lm'] / co_df['availability']
 co_df['coverage'] = co_df['available_qty'] / co_df['sales_velocity'] / 7
 
+co_df = co_df.loc[co_df['publishing_date'] < co_df['calculation_date']]
 co_df = co_df.loc[(co_df['calculation_date'] - co_df['publishing_date']).dt.days > 14]
-co_df = co_df.loc[((co_df['co_status'] != 'Existing CO') & (co_df['co_status'] != 'New CO')) | (co_df['coverage'] > 56)]
+co_df = co_df.loc[(co_df['co_status'] != 'Existing CO') | (co_df['coverage'] > 56)]
+
 # print(co_df)
 
 tm_reduction_cond_co = [(co_df['co_status'] == 'Existing CO') & (co_df['available_qty'] > 2) & (co_df['coverage'] > 56), #Existing CO
@@ -469,7 +471,7 @@ all_df = all_df[['sku', 'brand', 'season', 'last_season', 'season_group', 'co_st
                  'actual_st', 'coverage', 'max_reduction', 'revised_tm', 'tm_diff', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1', 'new_pb_FF', 'new_pb_FFGB', 'im_change']]
 
 group_cond = [all_df['season_group'] == '1. Carry-Overs', (all_df['season'] == new_season) | (all_df['season'] == current_season)]
-all_df['calculation_group'] = np.select(group_cond, [all_df['co_status'], all_df['season']], default='old')
+all_df['calculation_group'] = np.select(group_cond, [all_df['co_status'], all_df['season']], default='Old')
 
 def create_excel (writer:pd.ExcelWriter, df:pd.DataFrame, sheetname:str='Sheet1', index=True):
     df.style.set_properties(**{'text-align': 'left'}).to_excel(writer, sheet_name=sheetname, index=index, float_format='%.2f')
@@ -479,7 +481,7 @@ def create_excel (writer:pd.ExcelWriter, df:pd.DataFrame, sheetname:str='Sheet1'
         writer.sheets[sheetname].set_column(col_idx, col_idx, column_length)
 
 print('* Detailed output')
-with pd.ExcelWriter(currentlocation + '\\x_RevisedTM_ALL_' + calc_date + '.xlsx') as writer:
+with pd.ExcelWriter(currentlocation + '\\_RevisedTM_ALL_' + calc_date + '.xlsx') as writer:
     create_excel(writer, new_df, 'AW25', index=False)
     create_excel(writer, current_df, 'SS25', index=False)
     create_excel(writer, co_df, 'CO', index=False)
@@ -487,7 +489,7 @@ with pd.ExcelWriter(currentlocation + '\\x_RevisedTM_ALL_' + calc_date + '.xlsx'
     create_excel(writer, ab_df_prices, 'AB', index=False)
 
 print('* Summaries')
-with pd.ExcelWriter(currentlocation + '\\x_RevisedTM_Summary_' + calc_date + '.xlsx') as writer:
+with pd.ExcelWriter(currentlocation + '\\_RevisedTM_Summary_' + calc_date + '.xlsx') as writer:
     create_excel(writer, all_df, 'ALL', index=False)
     create_excel(writer, new_summary, 'AW25', index=False)
     create_excel(writer, current_summary, 'SS25', index=False)
@@ -496,7 +498,7 @@ with pd.ExcelWriter(currentlocation + '\\x_RevisedTM_Summary_' + calc_date + '.x
     create_excel(writer, ab_summary, 'AB', index=False)
 
 print('* All products for upload')
-with pd.ExcelWriter(currentlocation + '\\x_RevisedTM_Summary_All_' + calc_date + '.xlsx') as writer:
+with pd.ExcelWriter(currentlocation + '\\_RevisedTM_Summary_All.xlsx') as writer:
     create_excel(writer, all_df, 'ALL', index=False)
 
 finish_time = dt.datetime.now()
