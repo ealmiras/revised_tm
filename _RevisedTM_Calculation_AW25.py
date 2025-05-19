@@ -91,18 +91,18 @@ print('* AB pricebooks')
 pb_file_path = 'C:\\Users\\TLG User\\The Level Group\\BI - Reporting - 09. LN - 09. LN\\LN_PO\\Pricebooks\\Export_Pricebook_SKU.xlsx'
 
 ab_pb_list = ['09ROW1_AB', '09ROW_AB', '09AU_AB', '09KR_AB', '09CN_AB', '09GB_AB', '09US_AB', '09JP_AB', '09HK_AB']
-ab_pb_df = pd.DataFrame(columns=['SKU'])
 
-for i in tqdm(range(len(ab_pb_list)), desc="-- Processing", unit="iteration"): #ab_pb_list:
-    pb = ab_pb_list[i]
-    pb_content = pd.read_excel(pb_file_path, sheet_name = pb)
-    pb_content = pb_content[['SKU', 'Amount']].dropna(subset=['SKU'])
-    pb_content = pb_content.groupby(['SKU']).max().reset_index(drop=False)
-    pb_content = pb_content.rename(columns={'Amount' : pb})
-    ab_pb_df = ab_pb_df.merge(pb_content, how='outer', left_on='SKU', right_on='SKU').reset_index(drop=True)
+# ab_pb_df = pd.DataFrame(columns=['SKU'])
+# for i in tqdm(range(len(ab_pb_list)), desc="-- Processing", unit="iteration"): #ab_pb_list:
+#     pb = ab_pb_list[i]
+#     pb_content = pd.read_excel(pb_file_path, sheet_name = pb)
+#     pb_content = pb_content[['SKU', 'Amount']].dropna(subset=['SKU'])
+#     pb_content = pb_content.groupby(['SKU']).max().reset_index(drop=False)
+#     pb_content = pb_content.rename(columns={'Amount' : pb})
+#     ab_pb_df = ab_pb_df.merge(pb_content, how='outer', left_on='SKU', right_on='SKU').reset_index(drop=True)
+# ab_pb_df.to_csv(currentlocation + '\\ab_pb_' + calc_date + '.csv', index=False)
 
-ab_pb_df.to_csv(currentlocation + '\\ab_pb' + calc_date + '.csv', index=False)
-ab_pb_df = pd.read_csv(currentlocation + '\\ab_pb' + calc_date + '.csv')
+ab_pb_df = pd.read_csv(currentlocation + '\\ab_pb_' + calc_date + '.csv')
 
 # Product data - from the power automate export csv - connected to the Business Intelligence Dashboard
 print('* Importing data export')
@@ -352,7 +352,7 @@ co_df['coverage'] = co_df['available_qty'] / co_df['sales_velocity'] / 7
 
 co_df = co_df.loc[co_df['publishing_date'] < co_df['calculation_date']]
 co_df = co_df.loc[(co_df['calculation_date'] - co_df['publishing_date']).dt.days > 14]
-co_df = co_df.loc[(co_df['co_status'] != 'Existing CO') | (co_df['coverage'] > 56)]
+# co_df = co_df.loc[(co_df['co_status'] != 'Existing CO') | (co_df['coverage'] > 56)]
 
 # print(co_df)
 
