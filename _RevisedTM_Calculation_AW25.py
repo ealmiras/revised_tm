@@ -13,8 +13,8 @@ pd.options.mode.chained_assignment = None
 ## GENERAL INFORMATION -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 currentlocation = str(pathlib.Path(__file__).parent.absolute())[:-7]
 
-calc_date = '2025-05-19'
-arc_date = '2025-04-23'
+calc_date = '2025-07-24'
+arc_date = '2025-07-03'
 
 current_season = 'SS25'
 current_eos_date = '2025-12-01'
@@ -27,17 +27,17 @@ last_season = 'AW24'
 ## FUNCTIONS ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def run_query (df):
     query = open(currentlocation + '\\- Code\\_PricingQuery_NewCurrent.sql').read()
-    local_vars = {'df':df, 'promo_df':promo_df, 'promo_exc_df':promo_exc_df, 'mp_exclusions_df':mp_exclusions_df}
+    local_vars = {'df':df, 'promo_df':promo_df, 'promo_exc_df':promo_exc_df, 'brand_exclusions_df':brand_exclusions_df}
     return ps.sqldf(query, local_vars)
 
 def run_query_old (df):
     query = open(currentlocation + '\\- Code\\_PricingQuery_Old.sql').read()
-    local_vars = {'df':df, 'promo_df':promo_df, 'promo_exc_df':promo_exc_df, 'mp_exclusions_df':mp_exclusions_df}
+    local_vars = {'df':df, 'promo_df':promo_df, 'promo_exc_df':promo_exc_df, 'brand_exclusions_df':brand_exclusions_df}
     return ps.sqldf(query, local_vars)
 
 def run_query_co (df):
     query = open(currentlocation + '\\- Code\\_PricingQuery_CO.sql').read()
-    local_vars = {'df':df, 'promo_df':promo_df, 'promo_exc_df':promo_exc_df, 'mp_exclusions_df':mp_exclusions_df}
+    local_vars = {'df':df, 'promo_df':promo_df, 'promo_exc_df':promo_exc_df, 'brand_exclusions_df':brand_exclusions_df}
     return ps.sqldf(query, local_vars)
 
 def run_query_ab (df):
@@ -69,6 +69,9 @@ print('* Excluded brands')
 exclusions_q = """SELECT * FROM store_mngmnt.lncc_marketplaces_pricebooks_brands_exclusion"""
 mp_exclusions_df = pd.read_sql_query(exclusions_q, engine)
 
+brand_exclusions_q = """SELECT * FROM store_mngmnt.marketplace_exclusions"""
+brand_exclusions_df = pd.read_sql_query(brand_exclusions_q, engine)
+
 print('* Promo file')
 promo_file_q = """SELECT sku, max_disc_b2b, max_disc_private, chameleon_flag FROM store_mngmnt.lncc_stock_management WHERE sku IS NOT NULL"""
 promo_df = pd.read_sql_query(promo_file_q, engine)
@@ -81,10 +84,19 @@ print('* Variable costs')
 v_cost_q = """SELECT * FROM store_mngmnt.lncc_variable_costs"""
 v_cost = pd.read_sql_query(v_cost_q, engine)
 
+print('* Merch subcategories')
+merch_subcat_q = """SELECT subcat , merch_subcat  FROM store_mngmnt.subcat_merch_mapping"""
+m_subcat = pd.read_sql_query(merch_subcat_q, engine)
+
+print('* Protected subcategories')
+p_subcat_q = """SELECT * FROM store_mngmnt.protected_subcategories"""
+p_subcat = pd.read_sql_query(p_subcat_q, engine)
+
 # mp_exclusions_df = pd.read_csv(currentlocation + '\\- Useful\\MPExclusions.csv')
 # promo_df = pd.read_csv(currentlocation + '\\- Useful\\Promo.csv')
 # promo_exc_df = pd.read_csv(currentlocation + '\\- Useful\\PromoExclusions.csv')
 # v_cost = pd.read_csv(currentlocation + '\\- Useful\\VariableCosts.csv')
+# p_subcat = pd.read_csv(currentlocation + '\\- Useful\\ProtectedSubcategories.csv')
 
 # AB Price Books
 print('* AB pricebooks')
@@ -109,11 +121,13 @@ print('* Importing data export')
 
 df = pd.read_csv(currentlocation + '\\RevisedTM_DataExport.csv')
 df = df.loc[(df['season'] != 'SS26')]
-# df = df.loc[df['season_group'] != '4. Restricted']
+df = df.loc[df['season_group'] != '4. Restricted']
+df = df.loc[df['brand'] != 'Saucony SILO']
 
 co_df = pd.read_csv(currentlocation + '\\RevisedTM_DataExport_CO.csv')
 # co_df = co_df.loc[(co_df['co_status'] != 'Existing CO') & (co_df['co_status'] != 'New CO')]
-# co_df = co_df.loc[co_df['season_group'] != '4. Restricted']
+co_df = co_df.loc[co_df['season_group'] != '4. Restricted']
+co_df = co_df.loc[co_df['brand'] != 'Saucony SILO']
 
 
 df['publishing_date'] = pd.to_datetime(df['publishing_date'], format="%Y-%m-%d")
@@ -127,6 +141,11 @@ df = df.loc[df['publishing_date'] < df['calculation_date']]
 df['actual_st'] = df['net_whs_value'] / (df['stock_on_hand'] - df['net_whs_value']) *-1
 df['ff_brand_cluster'] = np.where(df['brand'].str.lower in ['balenciaga', 'saint laurent', 'gucci', 'bottega veneta', 'max mara', 'the row'], 'reduced', 'normal')
 
+df = df.merge(p_subcat[['brand_subcat', 'protected']], how='left', left_on=df['brand'].str.lower()+df['subcat_merch'].str.lower(), right_on=p_subcat['brand_subcat'])
+df = df.drop(columns=['brand_subcat'])
+
+# print(df.loc[df['protected'].notnull()])
+
 # # If the price of previous week is lower, use that one
 # archive_tm = pd.read_excel(currentlocation + '\\ArchivePrices_' + arc_date + '.xlsx', sheet_name='Archive')[['sku', 'pb_im_arc']]
 # df = pd.merge(df, archive_tm, how='left', left_on='sku', right_on='sku').reset_index(drop=True)
@@ -136,7 +155,8 @@ df['ff_brand_cluster'] = np.where(df['brand'].str.lower in ['balenciaga', 'saint
 # Separating data by the season
 new_df = df.loc[df['season'] == new_season]
 current_df = df.loc[df['season'] == current_season]
-old_df = df.loc[(df['season'] != current_season) & (df['season'] != new_season) & (df['season'] != 'CO')]
+last_df = df.loc[df['season'] == last_season]
+old_df = df.loc[(df['season'] != current_season) & (df['season'] != new_season) & (df['season'] != last_season) & (df['season'] != 'CO')]
 
 ## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## NEW SEASON
@@ -147,7 +167,7 @@ new_season_groups = [(new_df['season_group'] == '3. Seasonal'),
                      (new_df['season_group'] == '2. Seasonal no MD')]
 new_eos_st_goals = [0.6, 0.55]
 eos_tms = [0, 0.1]
-tm_reduction_caps = [0.05, 0.05]
+tm_reduction_caps = [0.1, 0.05]
 
 new_df['eos_st_goal'] = np.select(new_season_groups, new_eos_st_goals, default=np.nan)
 new_df['eos_tm'] = np.select(new_season_groups, eos_tms, default=eos_tms[1])
@@ -161,12 +181,7 @@ new_df['online_weeks'] = round((new_df['calculation_date'] - new_df['publishing_
 new_df['target'] = new_df['goal_perc_st_weekly'] * new_df['online_weeks']
 # new_df['actual_st'] = new_df['net_whs_value'] / (new_df['stock_on_hand'] - new_df['net_whs_value']) *-1
 
-ideal_tm_cond = [((new_df['brand'] == 'Gucci') & (new_df['season'] == 'CO')), 
-                       ((new_df['brand'] == 'Gucci') & (new_df['season'] != 'CO')),
-                       ((new_df['brand'] != 'Gucci') & (new_df['season'] == 'CO')),
-                       ((new_df['brand'] != 'Gucci') & (new_df['season'] != 'CO'))]
-ideal_tms = [0.375, 0.275, 0.325, 0.225]
-new_df['ideal_tm'] = np.select(ideal_tm_cond, ideal_tms, default=ideal_tms[3])
+new_df['ideal_tm'] = np.where(new_df['protected'] == True, 0.275, 0.225)
 
 new_df['tm_margin'] = new_df['actual_gm_im'] - new_df['eos_tm']
 new_df['tm_margin week'] = new_df['tm_margin'] / ((new_df['current_eos_date'] - new_df['calculation_date']).dt.days / 7)
@@ -188,20 +203,13 @@ new_ab = new_df[['sku', 'season', 'season_group', 'publishing_date', 'calculatio
 
 new_summary = run_query(new_df)
 new_summary = new_summary.loc[new_summary['in_promo'] == "N"].reset_index(drop=True)
-
-# new_summary['ff_high'] = np.where(new_summary['ff_brand_cluster'] == 'reduced', 0.95, 0.85)*new_summary['pb_row1']
-# new_summary['ff_low'] = new_summary['pb_row1']*0.6
-# new_summary['ff_base'] = (new_summary['new_pb_IM'] + 15)*1.22
-# new_summary['new_pb_FF'] = np.where(new_summary['ff_high'] < new_summary['ff_base'], new_summary['ff_high'], np.where(new_summary['ff_low'] > new_summary['ff_base'], new_summary['ff_low'], new_summary['ff_base']))
-# new_summary['new_pb_FF'] = round(new_summary['new_pb_FF'], 0)
-# new_summary['new_pb_FFGB'] = round((new_summary['new_pb_FF']/new_summary['pb_row1'])*new_summary['pb_gb'], 0)
-# new_summary.drop(columns={'ff_high', 'ff_low', 'ff_base', 'ff_brand_cluster'}, inplace=True)
+new_summary['new_pb_IM'] = new_summary['new_pb_IM'].where(new_summary['new_pb_IM'] < new_summary['pb_row1']/1.22, other=new_summary['pb_row1']/1.22)
 
 new_summary['im_change'] = new_summary['new_pb_IM'] / new_summary['pb_im'] - 1
 print('# of SKU prices calculated for ' + new_season + ': ' + str(new_summary['sku'].count()))
 print(new_summary.head())
 
-all_new = new_summary[['sku', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1']]#, 'new_pb_FF', 'new_pb_FFGB']]
+all_new = new_summary[['sku', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1']]
 
 ## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # CURRENT SEASON
@@ -211,7 +219,7 @@ print(f'\nCURRENT SEASON: \n')
 current_season_groups = [(current_df['season_group'] == '3. Seasonal'), 
                          (current_df['season_group'] == '2. Seasonal no MD')]
 new_eos_st_goals = [0.70, 0.65]
-eos_tms = [-0.05, 0.05]
+eos_tms = [-0.08, 0.02]
 tm_reduction_caps = [0.1, 0.1]
 
 current_df['eos_st_goal'] = np.select(current_season_groups, new_eos_st_goals, default=np.nan)
@@ -226,12 +234,7 @@ current_df['online_weeks'] = round((current_df['calculation_date'] - current_df[
 current_df['target'] = current_df['goal_perc_st_weekly'] * current_df['online_weeks']
 # current_df['actual_st'] = current_df['net_whs_value'] / (current_df['stock_on_hand'] - current_df['net_whs_value']) *-1
 
-ideal_tm_cond = [((current_df['brand'] == 'Gucci') & (current_df['season'] == 'CO')), 
-                       ((current_df['brand'] == 'Gucci') & (current_df['season'] != 'CO')),
-                       ((current_df['brand'] != 'Gucci') & (current_df['season'] == 'CO')),
-                       ((current_df['brand'] != 'Gucci') & (current_df['season'] != 'CO'))]
-ideal_tms = [0.375, 0.275, 0.325, 0.225]
-current_df['ideal_tm'] = np.select(ideal_tm_cond, ideal_tms, default=0.225)
+current_df['ideal_tm'] = np.where(current_df['protected'] == True, 0.275, 0.225)
 
 current_df['tm_margin'] = current_df['actual_gm_im'] - current_df['eos_tm']
 current_df['tm_margin week'] = current_df['tm_margin'] / ((current_df['current_eos_date'] - current_df['calculation_date']).dt.days / 7)
@@ -252,20 +255,59 @@ current_ab = current_df[['sku', 'season', 'season_group', 'publishing_date', 'ca
 
 current_summary = run_query(current_df)
 current_summary = current_summary.loc[current_summary['in_promo'] == "N"].reset_index(drop=True)
-
-# current_summary['ff_high'] = np.where(current_summary['ff_brand_cluster'] == 'reduced', 0.95, 0.85)*current_summary['pb_row1']
-# current_summary['ff_low'] = current_summary['pb_row1']*0.6
-# current_summary['ff_base'] = (current_summary['new_pb_IM'] + 15)*1.22
-# current_summary['new_pb_FF'] = np.where(current_summary['ff_high'] < current_summary['ff_base'], current_summary['ff_high'], np.where(current_summary['ff_low'] > current_summary['ff_base'], current_summary['ff_low'], current_summary['ff_base']))
-# current_summary['new_pb_FF'] = round(current_summary['new_pb_FF'], 0)
-# current_summary['new_pb_FFGB'] = round((current_summary['new_pb_FF']/current_summary['pb_row1'])*current_summary['pb_gb'], 0)
-# current_summary.drop(columns={'ff_high', 'ff_low', 'ff_base', 'ff_brand_cluster'}, inplace=True)
+current_summary['new_pb_IM'] = current_summary['new_pb_IM'].where(current_summary['new_pb_IM'] < current_summary['pb_row1']/1.22, other=current_summary['pb_row1']/1.22)
 
 current_summary['im_change'] = current_summary['new_pb_IM'] / current_summary['pb_im'] - 1
 print('# of SKU prices calculated for ' + current_season + ': ' + str(current_summary['sku'].count()))
 print(current_summary.head())
 
 all_current = current_summary[['sku', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1']]#, 'new_pb_FF', 'new_pb_FFGB']]
+
+## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## LAST SEASON
+print('---'*20)
+print(f'\nLAST SEASON: \n')
+
+last_df['actual_gm_im'] = 1 - last_df['eur_cost_price'] / last_df['pb_im']
+
+tm_reduction_cond = [((last_df['season_group'] == '3. Seasonal') & (last_df['actual_st'] < 0.3)),
+                     ((last_df['season_group'] == '3. Seasonal') & (last_df['actual_st'] < 0.6)),
+                     ((last_df['season_group'] == '3. Seasonal') & (last_df['actual_st'] < 0.95)),
+                     ((last_df['season_group'] == '3. Seasonal') & (last_df['actual_st'] <= 1)),
+                     ((last_df['season_group'] == '2. Seasonal no MD') & (last_df['actual_st'] < 0.25)),
+                     ((last_df['season_group'] == '2. Seasonal no MD') & (last_df['actual_st'] < 0.4)),
+                     ((last_df['season_group'] == '2. Seasonal no MD') & (last_df['actual_st'] < 0.85)),
+                     ((last_df['season_group'] == '2. Seasonal no MD') & (last_df['actual_st'] <= 1))]
+reducted_tm_os = [-0.20, -0.15, -0.10, last_df['actual_gm_im'],
+                  -0.10, -0.05, 0, last_df['actual_gm_im']]
+max_reduction = [-0.15, -0.15, -0.15, 0,
+                 -0.10, -0.10, -0.10, 0]
+
+last_df['calculated_tm'] = np.select(tm_reduction_cond, reducted_tm_os, default=0)
+last_df['max_reduction'] = np.select(tm_reduction_cond, max_reduction, default=0)
+last_df['revised_tm'] = last_df['calculated_tm'].where(last_df['calculated_tm'] > (last_df['actual_gm_im'] + last_df['max_reduction']), other=(last_df['actual_gm_im'] + last_df['max_reduction']))
+
+last_df['revised_tm'] = last_df['revised_tm'].where((last_df['revised_tm'] < last_df['actual_gm_im']) | (last_df['actual_gm_im'] < last_df['calculated_tm']), other = last_df['actual_gm_im'])
+# last_df['revised_tm'] = last_df['revised_tm'].where((last_df['revised_tm'] >= last_df['calculated_tm']) | (last_df['actual_st'] < 0.95), other = 0)
+
+last_df['revised_tm'] = last_df['revised_tm'].where(last_df['pb_im'] > 0, other = last_df['calculated_tm'])
+last_df['min_price'] = np.where(last_df['season_group'] == '4. Restricted', last_df['pb_row1']*0.8, 0)
+last_df['min_tm'] = np.where(last_df['season_group'] == '4. Restricted', 1 - last_df['eur_cost_price'] / last_df['min_price'], 0)
+last_df['revised_tm'] = last_df['revised_tm'].where(last_df['min_price'] == 0, last_df['min_tm'])
+
+last_df['tm_diff'] = last_df['revised_tm'] - last_df['actual_gm_im']
+
+last_ab = last_df[['sku', 'season', 'season_group', 'publishing_date', 'calculation_date', 'private_high', 'private_medium', 'public_high', 'public_medium', 'eur_cost_price', 'revised_tm', 'max_reduction']]
+
+last_summary = run_query_old(last_df).reset_index(drop=True)
+last_summary = last_summary.loc[last_summary['in_promo'] == "N"]
+last_summary['new_pb_IM'] = last_summary['new_pb_IM'].where(last_summary['new_pb_IM'] < last_summary['pb_row1']/1.22, other=last_summary['pb_row1']/1.22)
+
+last_summary['im_change'] = last_summary['new_pb_IM'] / last_summary['pb_im'] - 1
+print('# of SKU prices calculated for ' + last_season + ': ' + str(last_summary['sku'].count()))
+print(last_summary.head())
+
+all_last = last_summary[['sku', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1']]
 
 ## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## OLD SEASON
@@ -290,7 +332,10 @@ max_reduction = [-0.15, -0.15, -0.15, 0,
 old_df['calculated_tm'] = np.select(tm_reduction_cond, reducted_tm_os, default=0)
 old_df['max_reduction'] = np.select(tm_reduction_cond, max_reduction, default=0)
 old_df['revised_tm'] = old_df['calculated_tm'].where(old_df['calculated_tm'] > (old_df['actual_gm_im'] + old_df['max_reduction']), other=(old_df['actual_gm_im'] + old_df['max_reduction']))
-old_df['revised_tm'] = old_df['revised_tm'].where(old_df['revised_tm'] < old_df['actual_gm_im'], other = old_df['actual_gm_im'])
+
+old_df['revised_tm'] = old_df['revised_tm'].where((old_df['revised_tm'] < old_df['actual_gm_im']) | (old_df['actual_gm_im'] < old_df['calculated_tm']), other = old_df['actual_gm_im'])
+# old_df['revised_tm'] = old_df['revised_tm'].where((old_df['revised_tm'] >= old_df['calculated_tm']) | (old_df['actual_st'] < 0.95), other = 0)
+
 old_df['revised_tm'] = old_df['revised_tm'].where(old_df['pb_im'] > 0, other = old_df['calculated_tm'])
 old_df['min_price'] = np.where(old_df['season_group'] == '4. Restricted', old_df['pb_row1']*0.8, 0)
 old_df['min_tm'] = np.where(old_df['season_group'] == '4. Restricted', 1 - old_df['eur_cost_price'] / old_df['min_price'], 0)
@@ -302,20 +347,13 @@ old_ab = old_df[['sku', 'season', 'season_group', 'publishing_date', 'calculatio
 
 old_summary = run_query_old(old_df).reset_index(drop=True)
 old_summary = old_summary.loc[old_summary['in_promo'] == "N"]
-
-# old_summary['ff_high'] = np.where(old_summary['ff_brand_cluster'] == 'reduced', 0.95, 0.85)*old_summary['pb_row1']
-# old_summary['ff_low'] = np.where(old_summary['season'] == last_season, old_summary['pb_row1']*0.5, old_summary['pb_row1']*0.4)
-# old_summary['ff_base'] = (old_summary['new_pb_IM'] + 15)*1.22
-# old_summary['new_pb_FF'] = np.where(old_summary['ff_high'] < old_summary['ff_base'], old_summary['ff_high'], np.where(old_summary['ff_low'] > old_summary['ff_base'], old_summary['ff_low'], old_summary['ff_base']))
-# old_summary['new_pb_FF'] = round(old_summary['new_pb_FF'], 0)
-# old_summary['new_pb_FFGB'] = round((old_summary['new_pb_FF']/old_summary['pb_row1'])*old_summary['pb_gb'], 0)
-# old_summary.drop(columns={'ff_high', 'ff_low', 'ff_base', 'ff_brand_cluster'}, inplace=True)
+old_summary['new_pb_IM'] = old_summary['new_pb_IM'].where(old_summary['new_pb_IM'] < old_summary['pb_row1']/1.22, other=old_summary['pb_row1']/1.22)
 
 old_summary['im_change'] = old_summary['new_pb_IM'] / old_summary['pb_im'] - 1
-print('# of SKU prices calculated for ' + last_season + ' & old seasons: ' + str(old_summary['sku'].count()))
+print('# of SKU prices calculated for old seasons: ' + str(old_summary['sku'].count()))
 print(old_summary.head())
 
-all_old = old_summary[['sku', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1']]#, 'new_pb_FF', 'new_pb_FFGB']]
+all_old = old_summary[['sku', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1']]
 
 ## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## CO SEASON
@@ -395,18 +433,11 @@ co_ab = co_df[['sku', 'season', 'season_group', 'publishing_date', 'calculation_
 
 co_summary = run_query_co(co_df).reset_index(drop=True)
 co_summary = co_summary.loc[co_summary['in_promo'] == "N"].reset_index(drop=True)
+co_summary['new_pb_IM'] = co_summary['new_pb_IM'].where(co_summary['new_pb_IM'] < co_summary['pb_row1']/1.22, other=co_summary['pb_row1']/1.22)
 
 seasons = [co_summary['last_season'] == new_season,
            co_summary['last_season'] == current_season,
            co_summary['last_season'] == last_season]
-
-# co_summary['ff_high'] = np.where(co_summary['ff_brand_cluster'] == 'reduced', 0.95, 0.85)*co_summary['pb_row1']
-# co_summary['ff_low'] = np.select(seasons, [0.6, 0.6, 0.5], default=0.4)*co_summary['pb_row1']
-# co_summary['ff_base'] = (co_summary['new_pb_IM'] + 15)*1.22
-# co_summary['new_pb_FF'] = np.where(co_summary['ff_high'] < co_summary['ff_base'], co_summary['ff_high'], np.where(co_summary['ff_low'] > co_summary['ff_base'], co_summary['ff_low'], co_summary['ff_base']))
-# co_summary['new_pb_FF'] = round(co_summary['new_pb_FF'], 0)
-# co_summary['new_pb_FFGB'] = round((co_summary['new_pb_FF']/co_summary['pb_row1'])*co_summary['pb_gb'], 0)
-# co_summary.drop(columns={'ff_high', 'ff_low', 'ff_base', 'ff_brand_cluster'}, inplace=True)
 
 co_summary['im_change'] = co_summary['new_pb_IM'] / co_summary['pb_im'] - 1
 print('# of SKU prices calculated for CO: ' + str(co_summary['sku'].count()))
@@ -451,21 +482,51 @@ print('# of SKU prices calculated for Resellers: ' + str(ab_df_prices['sku'].cou
 print(ab_summary.head())
 
 ## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## EXCLUSIONS
+all_df = pd.concat([new_summary, current_summary, co_summary, last_summary, old_summary])
+all_df = all_df.loc[all_df['pb_im'] > 0].reset_index(drop=True)
+all_df = all_df[['sku', 'brand', 'season', 'last_season', 'season_group', 'co_status', 'pb_row1', 'pb_im', 'pb_ce', 'pb_xsln1', 'actual_gm_im', 'available_qty', 'eur_cost_price', 'stock_on_hand', 
+                 'actual_st', 'coverage', 'max_reduction', 'revised_tm', 'tm_diff', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1', 'im_change', 'protected', 'online_com', 'online_im']]
+
+season_tiers = [
+    (all_df['season'] == new_season) | (all_df['last_season'] == new_season),
+    (all_df['season'] == current_season) | (all_df['last_season'] == current_season),
+    (all_df['season'] == last_season) | (all_df['last_season'] == last_season)
+]
+
+all_df['exc_tier_season'] = np.select(season_tiers, ['1', '2', '3'], default = '4')
+all_df['key'] = all_df['exc_tier_season']+all_df['brand'].str.lower()
+
+brand_exclusions_df['flag'] = 'y'
+brand_exclusions_df['key'] = brand_exclusions_df['season_rank'].astype(str) + brand_exclusions_df['brand']
+
+# print(brand_exclusions_df)
+
+exc_im = brand_exclusions_df.loc[brand_exclusions_df['tier'] == 0]
+exc_ce = brand_exclusions_df.loc[brand_exclusions_df['tier'] == 3]
+exc_xsln1 = brand_exclusions_df.loc[brand_exclusions_df['tier'] == 2]
+
+all_df = all_df.merge(exc_im[['key', 'flag']], how='left', on='key').rename(columns={'flag':'im_exc'}).fillna({'im_exc':'n'})
+all_df = all_df.merge(exc_ce[['key', 'flag']], how='left', on='key').rename(columns={'flag':'ce_exc'}).fillna({'ce_exc':'n'})
+all_df = all_df.merge(exc_xsln1[['key', 'flag']], how='left', on='key').rename(columns={'flag':'xs_exc'}).fillna({'xs_exc':'n'})
+
+all_df['new_pb_IM'] = all_df['new_pb_IM'].where(all_df['im_exc'] == 'n', other=0)
+all_df['new_pb_CE'] = all_df['new_pb_CE'].where(all_df['ce_exc'] == 'n', other=0)
+all_df['new_pb_XSLN1'] = all_df['new_pb_XSLN1'].where(all_df['xs_exc'] == 'n', other=0)
+
+# print(all_df)
+
+## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## EXPORTS
 print('---'*20)
 print(f'\nEXPORTING FILES: \n')
 
 print('* Price archives')
-archive_df = pd.concat([all_new, all_current, all_co, all_old]).rename(columns={'new_pb_IM': 'pb_im_arc', 'new_pb_CE': 'pb_ce_arc', 'new_pm_XSLN1': 'pb_xsln1_arc'}).reset_index(drop=True)
+archive_df = all_df[['sku', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1']].rename(columns={'new_pb_IM': 'pb_im_arc', 'new_pb_CE': 'pb_ce_arc', 'new_pm_XSLN1': 'pb_xsln1_arc'}).reset_index(drop=True)
 archive_df = archive_df.loc[archive_df['pb_im_arc'] != 0]
 archive_df.to_excel(currentlocation + '\\ArchivePrices_' + calc_date + '.xlsx', sheet_name='Archive', index=False)
 
-all_df = pd.concat([new_summary, current_summary, co_summary, old_summary])
-all_df = all_df.loc[all_df['pb_im'] > 0].reset_index(drop=True)
-all_df = all_df[['sku', 'brand', 'season', 'last_season', 'season_group', 'co_status', 'pb_row1', 'pb_im', 'actual_gm_im', 'available_qty', 'eur_cost_price', 'stock_on_hand', 
-                 'actual_st', 'coverage', 'max_reduction', 'revised_tm', 'tm_diff', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1', 'im_change']]#, 'new_pb_FF', 'new_pb_FFGB']]
-
-group_cond = [all_df['season_group'] == '1. Carry-Overs', (all_df['season'] == new_season) | (all_df['season'] == current_season)]
+group_cond = [all_df['season_group'] == '1. Carry-Overs', (all_df['season'] == new_season) | (all_df['season'] == current_season) | (all_df['season'] == last_season)]
 all_df['calculation_group'] = np.select(group_cond, [all_df['co_status'], all_df['season']], default='Old')
 
 def create_excel (writer:pd.ExcelWriter, df:pd.DataFrame, sheetname:str='Sheet1', index=True):
@@ -481,6 +542,7 @@ with pd.ExcelWriter(currentlocation + '\\_RevisedTM_ALL_' + calc_date + '.xlsx')
     create_excel(writer, current_df, 'SS25', index=False)
     create_excel(writer, co_df, 'CO', index=False)
     create_excel(writer, old_df, 'OLD', index=False)
+    create_excel(writer, last_df, 'AW24', index=False)
     create_excel(writer, ab_df_prices, 'AB', index=False)
 
 print('* Summaries')
@@ -489,6 +551,7 @@ with pd.ExcelWriter(currentlocation + '\\_RevisedTM_Summary_' + calc_date + '.xl
     create_excel(writer, new_summary, 'AW25', index=False)
     create_excel(writer, current_summary, 'SS25', index=False)
     create_excel(writer, co_summary, 'CO', index=False)
+    create_excel(writer, last_summary, 'AW24', index=False)
     create_excel(writer, old_summary, 'OLD', index=False)
     create_excel(writer, ab_summary, 'AB', index=False)
 
