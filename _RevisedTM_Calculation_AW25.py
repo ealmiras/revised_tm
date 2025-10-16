@@ -13,8 +13,8 @@ pd.options.mode.chained_assignment = None
 ## GENERAL INFORMATION -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 currentlocation = str(pathlib.Path(__file__).parent.absolute())[:-7]
 
-calc_date = '2025-07-24'
-arc_date = '2025-07-03'
+calc_date = '2025-10-16'
+arc_date = '2025-10-02'
 
 current_season = 'SS25'
 current_eos_date = '2025-12-01'
@@ -65,54 +65,57 @@ print('Collecting required data:')
 
 engine = create_engine('postgresql+psycopg2://postgres:E8EMjzcplJMNj1bw@35.205.177.96:5432/bi')
 
-print('* Excluded brands')
-exclusions_q = """SELECT * FROM store_mngmnt.lncc_marketplaces_pricebooks_brands_exclusion"""
-mp_exclusions_df = pd.read_sql_query(exclusions_q, engine)
-
+print('* Brand exclusions')
 brand_exclusions_q = """SELECT * FROM store_mngmnt.marketplace_exclusions"""
 brand_exclusions_df = pd.read_sql_query(brand_exclusions_q, engine)
+brand_exclusions_df.to_csv(currentlocation + '\\- Useful\\BrandExclusions.csv', index=False)
 
 print('* Promo file')
 promo_file_q = """SELECT sku, max_disc_b2b, max_disc_private, chameleon_flag FROM store_mngmnt.lncc_stock_management WHERE sku IS NOT NULL"""
 promo_df = pd.read_sql_query(promo_file_q, engine)
+promo_df.to_csv(currentlocation + '\\- Useful\\Promo.csv', index=False)
 
 print('* Promo inclusions')
 promo_exc_q = """SELECT * FROM store_mngmnt.lncc_promo_exclusions WHERE sku IS NOT NULL"""
 promo_exc_df = pd.read_sql_query(promo_exc_q, engine)
+promo_exc_df.to_csv(currentlocation + '\\- Useful\\PromoExclusions.csv', index=False)
 
 print('* Variable costs')
 v_cost_q = """SELECT * FROM store_mngmnt.lncc_variable_costs"""
 v_cost = pd.read_sql_query(v_cost_q, engine)
-
-print('* Merch subcategories')
-merch_subcat_q = """SELECT subcat , merch_subcat  FROM store_mngmnt.subcat_merch_mapping"""
-m_subcat = pd.read_sql_query(merch_subcat_q, engine)
+v_cost.to_csv(currentlocation + '\\- Useful\\VariableCosts.csv', index=False)
 
 print('* Protected subcategories')
 p_subcat_q = """SELECT * FROM store_mngmnt.protected_subcategories"""
 p_subcat = pd.read_sql_query(p_subcat_q, engine)
+p_subcat.to_csv(currentlocation + '\\- Useful\\ProtectedSubcategories.csv', index=False)
 
-# mp_exclusions_df = pd.read_csv(currentlocation + '\\- Useful\\MPExclusions.csv')
+# print('* Brand exclusions')
+# brand_exclusions_df = pd.read_csv(currentlocation + '\\- Useful\\BrandExclusions.csv')
+# print('* Promo file')
 # promo_df = pd.read_csv(currentlocation + '\\- Useful\\Promo.csv')
+# print('* Promo inclusions')
 # promo_exc_df = pd.read_csv(currentlocation + '\\- Useful\\PromoExclusions.csv')
+# print('* Variable costs')
 # v_cost = pd.read_csv(currentlocation + '\\- Useful\\VariableCosts.csv')
+# print('* Protected subcategories')
 # p_subcat = pd.read_csv(currentlocation + '\\- Useful\\ProtectedSubcategories.csv')
 
-# AB Price Books
-print('* AB pricebooks')
+# Price Books
+print('* Pricebooks')
 pb_file_path = 'C:\\Users\\TLG User\\The Level Group\\BI - Reporting - 09. LN - 09. LN\\LN_PO\\Pricebooks\\Export_Pricebook_SKU.xlsx'
 
-ab_pb_list = ['09ROW1_AB', '09ROW_AB', '09AU_AB', '09KR_AB', '09CN_AB', '09GB_AB', '09US_AB', '09JP_AB', '09HK_AB']
+pb_list = ['09ROW1_AB', '09ROW_AB', '09AU_AB', '09KR_AB', '09CN_AB', '09GB_AB', '09US_AB', '09JP_AB', '09HK_AB', '09ROW1', '09ROW', '09AU', '09KR', '09CN', '09GB', '09US', '09JP', '09HKMO']
 
-# ab_pb_df = pd.DataFrame(columns=['SKU'])
-# for i in tqdm(range(len(ab_pb_list)), desc="-- Processing", unit="iteration"): #ab_pb_list:
-#     pb = ab_pb_list[i]
-#     pb_content = pd.read_excel(pb_file_path, sheet_name = pb)
-#     pb_content = pb_content[['SKU', 'Amount']].dropna(subset=['SKU'])
-#     pb_content = pb_content.groupby(['SKU']).max().reset_index(drop=False)
-#     pb_content = pb_content.rename(columns={'Amount' : pb})
-#     ab_pb_df = ab_pb_df.merge(pb_content, how='outer', left_on='SKU', right_on='SKU').reset_index(drop=True)
-# ab_pb_df.to_csv(currentlocation + '\\ab_pb_' + calc_date + '.csv', index=False)
+ab_pb_df = pd.DataFrame(columns=['SKU'])
+for i in tqdm(range(len(pb_list)), desc="-- Processing", unit="iteration"): #pb_list:
+    pb = pb_list[i]
+    pb_content = pd.read_excel(pb_file_path, sheet_name = pb)
+    pb_content = pb_content[['SKU', 'Amount']].dropna(subset=['SKU'])
+    pb_content = pb_content.groupby(['SKU']).max().reset_index(drop=False)
+    pb_content = pb_content.rename(columns={'Amount' : pb})
+    ab_pb_df = ab_pb_df.merge(pb_content, how='outer', left_on='SKU', right_on='SKU').reset_index(drop=True)
+ab_pb_df.to_csv(currentlocation + '\\ab_pb_' + calc_date + '.csv', index=False)
 
 ab_pb_df = pd.read_csv(currentlocation + '\\ab_pb_' + calc_date + '.csv')
 
@@ -143,14 +146,6 @@ df['ff_brand_cluster'] = np.where(df['brand'].str.lower in ['balenciaga', 'saint
 
 df = df.merge(p_subcat[['brand_subcat', 'protected']], how='left', left_on=df['brand'].str.lower()+df['subcat_merch'].str.lower(), right_on=p_subcat['brand_subcat'])
 df = df.drop(columns=['brand_subcat'])
-
-# print(df.loc[df['protected'].notnull()])
-
-# # If the price of previous week is lower, use that one
-# archive_tm = pd.read_excel(currentlocation + '\\ArchivePrices_' + arc_date + '.xlsx', sheet_name='Archive')[['sku', 'pb_im_arc']]
-# df = pd.merge(df, archive_tm, how='left', left_on='sku', right_on='sku').reset_index(drop=True)
-# df['pb_im_arc'].fillna(100000, inplace=True)
-# df['pb_im'] = np.where(df['pb_im'] > df['pb_im_arc'], df['pb_im_arc'], df['pb_im'])
 
 # Separating data by the season
 new_df = df.loc[df['season'] == new_season]
@@ -218,8 +213,8 @@ print(f'\nCURRENT SEASON: \n')
 
 current_season_groups = [(current_df['season_group'] == '3. Seasonal'), 
                          (current_df['season_group'] == '2. Seasonal no MD')]
-new_eos_st_goals = [0.70, 0.65]
-eos_tms = [-0.08, 0.02]
+new_eos_st_goals = [0.85, 0.75]
+eos_tms = [-0.1, -0.02]
 tm_reduction_caps = [0.1, 0.1]
 
 current_df['eos_st_goal'] = np.select(current_season_groups, new_eos_st_goals, default=np.nan)
@@ -278,8 +273,8 @@ tm_reduction_cond = [((last_df['season_group'] == '3. Seasonal') & (last_df['act
                      ((last_df['season_group'] == '2. Seasonal no MD') & (last_df['actual_st'] < 0.4)),
                      ((last_df['season_group'] == '2. Seasonal no MD') & (last_df['actual_st'] < 0.85)),
                      ((last_df['season_group'] == '2. Seasonal no MD') & (last_df['actual_st'] <= 1))]
-reducted_tm_os = [-0.20, -0.15, -0.10, last_df['actual_gm_im'],
-                  -0.10, -0.05, 0, last_df['actual_gm_im']]
+reducted_tm_os = [-0.22, -0.18, -0.12, last_df['actual_gm_im'],
+                  -0.12, -0.07, -0.02, last_df['actual_gm_im']]
 max_reduction = [-0.15, -0.15, -0.15, 0,
                  -0.10, -0.10, -0.10, 0]
 
@@ -287,7 +282,7 @@ last_df['calculated_tm'] = np.select(tm_reduction_cond, reducted_tm_os, default=
 last_df['max_reduction'] = np.select(tm_reduction_cond, max_reduction, default=0)
 last_df['revised_tm'] = last_df['calculated_tm'].where(last_df['calculated_tm'] > (last_df['actual_gm_im'] + last_df['max_reduction']), other=(last_df['actual_gm_im'] + last_df['max_reduction']))
 
-last_df['revised_tm'] = last_df['revised_tm'].where((last_df['revised_tm'] < last_df['actual_gm_im']) | (last_df['actual_gm_im'] < last_df['calculated_tm']), other = last_df['actual_gm_im'])
+last_df['revised_tm'] = last_df['revised_tm'].where((last_df['revised_tm'] < last_df['actual_gm_im']), other = last_df['actual_gm_im'])
 # last_df['revised_tm'] = last_df['revised_tm'].where((last_df['revised_tm'] >= last_df['calculated_tm']) | (last_df['actual_st'] < 0.95), other = 0)
 
 last_df['revised_tm'] = last_df['revised_tm'].where(last_df['pb_im'] > 0, other = last_df['calculated_tm'])
@@ -399,6 +394,7 @@ tm_reduction_cond_co = [(co_df['co_status'] == 'Existing CO') & (co_df['availabl
                        (co_df['co_status'] == 'Existing CO') & (co_df['coverage'] < 20), #Existing CO - reverse constraint
                        (co_df['co_status'] == 'New CO') & (co_df['available_qty'] > 2) & (co_df['coverage'] > 56), #New CO
                        (co_df['co_status'] == 'New CO') & (co_df['available_qty'] > 2) & (co_df['coverage'] > 36), #New CO
+                       (co_df['co_status'] == 'New CO') & (co_df['coverage'] < 20), #New CO - reverse constraint
                        (co_df['co_status'] == 'LS Existing CO') & (co_df['available_qty'] > 2) & (co_df['coverage'] > 56), #LS Existing CO
                        (co_df['co_status'] == 'LS Existing CO') & (co_df['available_qty'] > 2) & (co_df['coverage'] > 36), #LS Existing CO
                        (co_df['co_status'] == 'LS New CO') & (co_df['coverage'] > 56), #LS New CO
@@ -407,13 +403,13 @@ tm_reduction_cond_co = [(co_df['co_status'] == 'Existing CO') & (co_df['availabl
                        (co_df['co_status'] == 'Discontinued CO') & (co_df['coverage'] > 36)] #Discontinue CO
 
 reducted_tm_os_co = [0.05, 0.15, co_df['actual_gm_im'] + 0.05,
-                     0.03, 0.05, 
+                     0.05, 0.15, co_df['actual_gm_im'] + 0.05,
                      -0.05, 0, 
                      -0.15, -0.1,                   
                      -0.30, -0.20]
 
 max_reduction_co = [-0.1, -0.1, 0.05,
-                    -0.1, -0.1, 
+                    -0.1, -0.1, 0.05,
                     -0.1, -0.1,
                     -0.15, -0.15,
                     -0.2, -0.2]
@@ -462,13 +458,17 @@ ab_df = ab_df.merge(promo_df, how='left', left_on='sku', right_on='sku')
 ab_df['promo_filter'] = np.where(ab_df['max_disc_b2b'] > 0, 'N', 'Y')
 
 ab_df = ab_df.loc[(ab_df['sales_filter'] == 'Y') & (ab_df['publishing_filter'] == 'Y') & (ab_df['promo_filter'] == 'Y')][['sku', 'season', 'season_group', 'eur_cost_price', 'revised_tm', 'max_reduction']].reset_index(drop=False)
-ab_df['target_cm'] = ab_df['revised_tm'] - 0.05
+ab_df['target_cm'] = ab_df['revised_tm'] - 0.10
 
 ab_df = ab_df.merge(ab_pb_df, how='left', left_on='sku', right_on='SKU')[['sku', 'season', 'season_group', 'eur_cost_price', 'revised_tm', 'max_reduction', 'target_cm', 
                                                                           '09ROW1_AB', '09ROW_AB', '09AU_AB', '09KR_AB', '09CN_AB',
-                                                                          '09GB_AB', '09US_AB', '09JP_AB', '09HK_AB']]
+                                                                          '09GB_AB', '09US_AB', '09JP_AB', '09HK_AB', 
+                                                                          '09ROW1', '09ROW', '09AU', '09KR', '09CN',
+                                                                          '09GB', '09US', '09JP', '09HKMO']]
 ab_df = ab_df.rename(columns={'09ROW1_AB' : 'row1_ab', '09ROW_AB' : 'row_ab', '09AU_AB' : 'au_ab', '09KR_AB' : 'kr_ab',
-                              '09CN_AB' : 'cn_ab', '09GB_AB' : 'gb_ab' , '09US_AB' : 'us_ab', '09JP_AB' : 'jp_ab', '09HK_AB' : 'hk_ab'})
+                              '09CN_AB' : 'cn_ab', '09GB_AB' : 'gb_ab' , '09US_AB' : 'us_ab', '09JP_AB' : 'jp_ab', '09HK_AB' : 'hk_ab',
+                              '09ROW1' : 'row1', '09ROW' : 'row_', '09AU' : 'au', '09KR' : 'kr',
+                              '09CN' : 'cn', '09GB' : 'gb' , '09US' : 'us', '09JP' : 'jp', '09HKMO' : 'hk'})
 
 ab_df['max_reduction'] = abs(ab_df['max_reduction'])
 
@@ -476,7 +476,8 @@ ab_df_prices = run_query_ab(ab_df)
 ab_df_prices['lnbx_new'] = ab_df_prices['hk_ab_new']
 ab_summary = ab_df_prices[['sku', 'season', 'season_group', 'eur_cost_price', 'revised_tm', 'max_reduction', 'target_cm',
                           'row1_ab_new', 'row_ab_new', 'au_ab_new', 'kr_ab_new', 'cn_ab_new', 'gb_ab_new', 'us_ab_new', 'jp_ab_new', 'hk_ab_new', 'lnbx_new',
-                          'row1_ab_diff', 'row_ab_diff', 'au_ab_diff', 'kr_ab_diff', 'cn_ab_diff', 'gb_ab_diff', 'us_ab_diff', 'jp_ab_diff', 'hk_ab_diff']]
+                          'row1_ab_diff', 'row_ab_diff', 'au_ab_diff', 'kr_ab_diff', 'cn_ab_diff', 'gb_ab_diff', 'us_ab_diff', 'jp_ab_diff', 'hk_ab_diff',
+                          'row1_ab_disc', 'row_ab_disc', 'au_ab_disc', 'kr_ab_disc', 'cn_ab_disc', 'gb_ab_disc', 'us_ab_disc', 'jp_ab_disc', 'hk_ab_disc']]
 
 print('# of SKU prices calculated for Resellers: ' + str(ab_df_prices['sku'].count()))
 print(ab_summary.head())
