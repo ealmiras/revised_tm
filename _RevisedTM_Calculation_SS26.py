@@ -13,7 +13,7 @@ pd.options.mode.chained_assignment = None
 ## GENERAL INFORMATION -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 currentlocation = str(pathlib.Path(__file__).parent.absolute())[:-7]
 
-calc_date = '2026-01-27'
+calc_date = '2026-02-03'
 
 current_season = 'AW25'
 current_eos_date = '2026-04-01'
@@ -54,6 +54,85 @@ def restricted_cat (df):
             """
     local_vars = {'df':df}
     return ps.sqldf(query, local_vars)
+
+def subcat_date_mapper(subcat, publishing_date, mapping, eos_date, year_offset=0):
+    if subcat.lower() in mapping:
+        m = mapping[subcat.lower()]
+        y = dt.datetime.strptime(eos_date, "%Y-%m-%d").year + year_offset
+        season_date = dt.datetime(y, m, 1)
+        if publishing_date < season_date:
+            return season_date
+        else:
+            return publishing_date
+    else:
+        return publishing_date
+
+## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## DICTIONARIES AND VARIABLES
+seasonal_subcat_dates_ss = {
+    'hats' : 5,
+    'sunglasses' : 6,
+    'scarves' : 2,
+    'gloves' : 2,
+    'jackets' : 3,
+    't-shirts' : 5,
+    'tops' : 5,
+    'shirts' : 4,
+    'sweatshirts' : 3,
+    'knitwear' : 3,
+    'dresses' : 4,
+    'shorts' : 5,
+    'coats' : 2,
+    'polo shirts' : 5,
+    'track pants' : 5,
+    'swimwear' : 6,
+    'blazers' : 4,
+    'hats' : 5,
+    'pullovers' : 3,
+    'hats' : 5,
+    'boots' : 3,
+    'slip ons' : 5,
+    'flats' : 5,
+    'heels' : 4,
+    'sandals' : 5,
+    'slides' : 5,
+    'loafers' : 5,
+    'lace ups' : 4,
+    'platforms' : 4
+}
+
+seasonal_subcat_dates_aw = {
+    'hats' : 11,
+    'sunglasses' : 9,
+    'scarves' : 11,
+    'gloves' : 11,
+    'jackets' : 11,
+    't-shirts' : 10,
+    'tops' : 10,
+    'shirts' : 10,
+    'sweatshirts' : 10,
+    'knitwear' : 11,
+    'dresses' : 10,
+    'shorts' : 9,
+    'coats' : 11,
+    'polo shirts' : 10,
+    'track pants' : 10,
+    'swimwear' : 9,
+    'blazers' : 10,
+    'hats' : 11,
+    'pullovers' : 11,
+    'hats' : 11,
+    'boots' : 11,
+    'slip ons' : 10,
+    'flats' : 10,
+    'heels' : 11,
+    'sandals' : 10,
+    'slides' : 9,
+    'loafers' : 10,
+    'lace ups' : 11,
+    'platforms' : 10,
+
+}
 
 ## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## COLLECTING THE REQUIRED INFORMATION 
@@ -170,9 +249,11 @@ new_df['max_reduction'] = np.select(new_season_groups, tm_reduction_caps, defaul
 
 new_df['actual_gm_im'] = 1 - new_df['eur_cost_price'] / new_df['pb_im']
 
-new_df['possible_weeks'] = (new_df['new_eos_date'] - new_df['publishing_date']).dt.days / 7
+new_df['adjusted_date'] = new_df.apply(lambda row: subcat_date_mapper(row['subcat'], row['publishing_date'], seasonal_subcat_dates_ss, current_eos_date, 0), axis=1) # UPDATE when season changes
+
+new_df['possible_weeks'] = (new_df['new_eos_date'] - new_df['adjusted_date']).dt.days / 7
 new_df['goal_perc_st_weekly'] = new_df['eos_st_goal'] / new_df['possible_weeks']
-new_df['online_weeks'] = round((new_df['calculation_date'] - new_df['publishing_date']).dt.days / 7, 0)
+new_df['online_weeks'] = round((new_df['calculation_date'] - new_df['adjusted_date']).dt.days / 7, 0)
 new_df['target'] = new_df['goal_perc_st_weekly'] * new_df['online_weeks']
 # new_df['actual_st'] = new_df['net_whs_value'] / (new_df['stock_on_hand'] - new_df['net_whs_value']) *-1
 
@@ -194,7 +275,7 @@ new_df['revised_tm'] = new_df['revised_tm'].where(new_df['min_price'] == 0, new_
 new_df['tm_diff'] = new_df['revised_tm'] - new_df['actual_gm_im']
 # print(new_df)
 
-new_ab = new_df[['sku', 'season', 'season_group', 'publishing_date', 'calculation_date', 'private_high', 'private_medium', 'public_high', 'public_medium', 'eur_cost_price', 'revised_tm', 'max_reduction']]
+new_ab = new_df[['sku', 'season', 'season_group', 'publishing_date', 'adjusted_date', 'calculation_date', 'private_high', 'private_medium', 'public_high', 'public_medium', 'eur_cost_price', 'revised_tm', 'max_reduction']]
 
 new_summary = run_query(new_df)
 new_summary = new_summary.loc[new_summary['in_promo'] == "N"].reset_index(drop=True)
@@ -223,9 +304,11 @@ current_df['max_reduction'] = np.select(current_season_groups, tm_reduction_caps
 
 current_df['actual_gm_im'] = 1 - current_df['eur_cost_price'] / current_df['pb_im']
 
-current_df['possible_weeks'] = (current_df['current_eos_date'] - current_df['publishing_date']).dt.days / 7
+current_df['adjusted_date'] = current_df.apply(lambda row: subcat_date_mapper(row['subcat'], row['publishing_date'], seasonal_subcat_dates_aw, current_eos_date, -1), axis=1) # UPDATE when season changes
+
+current_df['possible_weeks'] = (current_df['current_eos_date'] - current_df['adjusted_date']).dt.days / 7
 current_df['goal_perc_st_weekly'] = current_df['eos_st_goal'] / current_df['possible_weeks']
-current_df['online_weeks'] = round((current_df['calculation_date'] - current_df['publishing_date']).dt.days / 7, 0)
+current_df['online_weeks'] = round((current_df['calculation_date'] - current_df['adjusted_date']).dt.days / 7, 0)
 current_df['target'] = current_df['goal_perc_st_weekly'] * current_df['online_weeks']
 # current_df['actual_st'] = current_df['net_whs_value'] / (current_df['stock_on_hand'] - current_df['net_whs_value']) *-1
 
@@ -246,7 +329,7 @@ current_df['revised_tm'] = current_df['revised_tm'].where(current_df['min_price'
 
 current_df['tm_diff'] = current_df['revised_tm'] - current_df['actual_gm_im']
 
-current_ab = current_df[['sku', 'season', 'season_group', 'publishing_date', 'calculation_date', 'private_high', 'private_medium', 'public_high', 'public_medium', 'eur_cost_price', 'revised_tm', 'max_reduction']]
+current_ab = current_df[['sku', 'season', 'season_group', 'publishing_date', 'adjusted_date', 'calculation_date', 'private_high', 'private_medium', 'public_high', 'public_medium', 'eur_cost_price', 'revised_tm', 'max_reduction']]
 
 current_summary = run_query(current_df)
 current_summary = current_summary.loc[current_summary['in_promo'] == "N"].reset_index(drop=True)
@@ -537,20 +620,20 @@ def create_excel (writer:pd.ExcelWriter, df:pd.DataFrame, sheetname:str='Sheet1'
 
 print('* Detailed output')
 with pd.ExcelWriter(currentlocation + '\\_RevisedTM_ALL_' + calc_date + '.xlsx') as writer:
-    create_excel(writer, new_df, 'AW25', index=False)
-    create_excel(writer, current_df, 'SS25', index=False)
+    create_excel(writer, new_df, new_season, index=False)
+    create_excel(writer, current_df, current_season, index=False)
     create_excel(writer, co_df, 'CO', index=False)
     create_excel(writer, old_df, 'OLD', index=False)
-    create_excel(writer, last_df, 'AW24', index=False)
+    create_excel(writer, last_df, last_season, index=False)
     create_excel(writer, ab_df_prices, 'AB', index=False)
 
 print('* Summaries')
 with pd.ExcelWriter(currentlocation + '\\_RevisedTM_Summary_' + calc_date + '.xlsx') as writer:
     create_excel(writer, all_df, 'ALL', index=False)
-    create_excel(writer, new_summary, 'AW25', index=False)
-    create_excel(writer, current_summary, 'SS25', index=False)
+    create_excel(writer, new_summary, new_season, index=False)
+    create_excel(writer, current_summary, current_season, index=False)
     create_excel(writer, co_summary, 'CO', index=False)
-    create_excel(writer, last_summary, 'AW24', index=False)
+    create_excel(writer, last_summary, last_season, index=False)
     create_excel(writer, old_summary, 'OLD', index=False)
     create_excel(writer, ab_summary, 'AB', index=False)
 
@@ -560,6 +643,6 @@ with pd.ExcelWriter(currentlocation + '\\_RevisedTM_Summary_All.xlsx') as writer
     create_excel(writer, ab_summary, 'AB', index=False)
 
 finish_time = dt.datetime.now()
-print(f'\nFinish time: {start_time}')
+print(f'\nFinish time: {finish_time.time()}')
 print(f'Time spent: {finish_time-start_time}')
 print('---'*20)
