@@ -13,16 +13,15 @@ pd.options.mode.chained_assignment = None
 ## GENERAL INFORMATION -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 currentlocation = str(pathlib.Path(__file__).parent.absolute())[:-7]
 
-calc_date = '2025-10-16'
-arc_date = '2025-10-02'
+calc_date = '2026-01-27'
 
-current_season = 'SS25'
-current_eos_date = '2025-12-01'
+current_season = 'AW25'
+current_eos_date = '2026-04-01'
 
-new_season = 'AW25'
-new_eos_date = '2025-11-01'
+new_season = 'SS26'
+new_eos_date = '2026-05-01'
 
-last_season = 'AW24'
+last_season = 'SS25'
 
 ## FUNCTIONS ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def run_query (df):
@@ -64,42 +63,42 @@ print('---'*20)
 print('Collecting required data:')
 
 engine = create_engine('postgresql+psycopg2://postgres:E8EMjzcplJMNj1bw@35.205.177.96:5432/bi')
+with engine.connect() as conn:
+    print('* Brand exclusions')
+    brand_exclusions_q = """SELECT * FROM store_mngmnt.marketplace_exclusions"""
+    brand_exclusions_df = pd.read_sql_query(brand_exclusions_q, conn)
+    brand_exclusions_df.to_csv(currentlocation + '\\- Useful\\BrandExclusions.csv', index=False)
+
+    print('* Promo file')
+    promo_file_q = """SELECT sku, max_disc_b2b, max_disc_private, chameleon_flag FROM store_mngmnt.lncc_stock_management WHERE sku IS NOT NULL"""
+    promo_df = pd.read_sql_query(promo_file_q, conn)
+    promo_df.to_csv(currentlocation + '\\- Useful\\Promo.csv', index=False)
+
+    print('* Promo inclusions')
+    promo_exc_q = """SELECT * FROM store_mngmnt.lncc_promo_exclusions WHERE sku IS NOT NULL"""
+    promo_exc_df = pd.read_sql_query(promo_exc_q, conn)
+    promo_exc_df.to_csv(currentlocation + '\\- Useful\\PromoExclusions.csv', index=False)
+
+    print('* Variable costs')
+    v_cost_q = """SELECT * FROM store_mngmnt.lncc_variable_costs"""
+    v_cost = pd.read_sql_query(v_cost_q, conn)
+    v_cost.to_csv(currentlocation + '\\- Useful\\VariableCosts.csv', index=False)
+
+    print('* Protected subcategories')
+    p_subcat_q = """SELECT * FROM store_mngmnt.protected_subcategories"""
+    p_subcat = pd.read_sql_query(p_subcat_q, conn)
+    p_subcat.to_csv(currentlocation + '\\- Useful\\ProtectedSubcategories.csv', index=False)
 
 print('* Brand exclusions')
-brand_exclusions_q = """SELECT * FROM store_mngmnt.marketplace_exclusions"""
-brand_exclusions_df = pd.read_sql_query(brand_exclusions_q, engine)
-brand_exclusions_df.to_csv(currentlocation + '\\- Useful\\BrandExclusions.csv', index=False)
-
+brand_exclusions_df = pd.read_csv(currentlocation + '\\- Useful\\BrandExclusions.csv')
 print('* Promo file')
-promo_file_q = """SELECT sku, max_disc_b2b, max_disc_private, chameleon_flag FROM store_mngmnt.lncc_stock_management WHERE sku IS NOT NULL"""
-promo_df = pd.read_sql_query(promo_file_q, engine)
-promo_df.to_csv(currentlocation + '\\- Useful\\Promo.csv', index=False)
-
+promo_df = pd.read_csv(currentlocation + '\\- Useful\\Promo.csv')
 print('* Promo inclusions')
-promo_exc_q = """SELECT * FROM store_mngmnt.lncc_promo_exclusions WHERE sku IS NOT NULL"""
-promo_exc_df = pd.read_sql_query(promo_exc_q, engine)
-promo_exc_df.to_csv(currentlocation + '\\- Useful\\PromoExclusions.csv', index=False)
-
+promo_exc_df = pd.read_csv(currentlocation + '\\- Useful\\PromoExclusions.csv')
 print('* Variable costs')
-v_cost_q = """SELECT * FROM store_mngmnt.lncc_variable_costs"""
-v_cost = pd.read_sql_query(v_cost_q, engine)
-v_cost.to_csv(currentlocation + '\\- Useful\\VariableCosts.csv', index=False)
-
+v_cost = pd.read_csv(currentlocation + '\\- Useful\\VariableCosts.csv')
 print('* Protected subcategories')
-p_subcat_q = """SELECT * FROM store_mngmnt.protected_subcategories"""
-p_subcat = pd.read_sql_query(p_subcat_q, engine)
-p_subcat.to_csv(currentlocation + '\\- Useful\\ProtectedSubcategories.csv', index=False)
-
-# print('* Brand exclusions')
-# brand_exclusions_df = pd.read_csv(currentlocation + '\\- Useful\\BrandExclusions.csv')
-# print('* Promo file')
-# promo_df = pd.read_csv(currentlocation + '\\- Useful\\Promo.csv')
-# print('* Promo inclusions')
-# promo_exc_df = pd.read_csv(currentlocation + '\\- Useful\\PromoExclusions.csv')
-# print('* Variable costs')
-# v_cost = pd.read_csv(currentlocation + '\\- Useful\\VariableCosts.csv')
-# print('* Protected subcategories')
-# p_subcat = pd.read_csv(currentlocation + '\\- Useful\\ProtectedSubcategories.csv')
+p_subcat = pd.read_csv(currentlocation + '\\- Useful\\ProtectedSubcategories.csv')
 
 # Price Books
 print('* Pricebooks')
@@ -123,7 +122,7 @@ ab_pb_df = pd.read_csv(currentlocation + '\\ab_pb_' + calc_date + '.csv')
 print('* Importing data export')
 
 df = pd.read_csv(currentlocation + '\\RevisedTM_DataExport.csv')
-df = df.loc[(df['season'] != 'SS26')]
+df = df.loc[(df['season'] != 'AW26')]
 df = df.loc[df['season_group'] != '4. Restricted']
 df = df.loc[df['brand'] != 'Saucony SILO']
 
@@ -133,13 +132,14 @@ co_df = co_df.loc[co_df['season_group'] != '4. Restricted']
 co_df = co_df.loc[co_df['brand'] != 'Saucony SILO']
 
 
-df['publishing_date'] = pd.to_datetime(df['publishing_date'], format="%Y-%m-%d")
+df['publishing_date'] = pd.to_datetime(df['publishing_date'].str[:10], format="%Y-%m-%d")
 df['stock_on_hand'] = df['available_qty'] * df['eur_cost_price']
 df['calculation_date'] = pd.to_datetime(calc_date, format="%Y-%m-%d")
 df['current_eos_date'] = pd.to_datetime(current_eos_date, format="%Y-%m-%d")
 df['new_eos_date'] = pd.to_datetime(new_eos_date, format="%Y-%m-%d")
-df['net_whs_value'].fillna(0, inplace=True)
-df = df.loc[df['publishing_date'] < df['calculation_date']]
+df.fillna({'net_whs_value':0}, inplace=True)
+# df = df.loc[df['publishing_date'] < df['calculation_date']]
+df = df.loc[(df['calculation_date'] - df['publishing_date']).dt.days > 14]
 
 df['actual_st'] = df['net_whs_value'] / (df['stock_on_hand'] - df['net_whs_value']) *-1
 df['ff_brand_cluster'] = np.where(df['brand'].str.lower in ['balenciaga', 'saint laurent', 'gucci', 'bottega veneta', 'max mara', 'the row'], 'reduced', 'normal')
@@ -162,7 +162,7 @@ new_season_groups = [(new_df['season_group'] == '3. Seasonal'),
                      (new_df['season_group'] == '2. Seasonal no MD')]
 new_eos_st_goals = [0.6, 0.55]
 eos_tms = [0, 0.1]
-tm_reduction_caps = [0.1, 0.05]
+tm_reduction_caps = [0.05, 0.05]
 
 new_df['eos_st_goal'] = np.select(new_season_groups, new_eos_st_goals, default=np.nan)
 new_df['eos_tm'] = np.select(new_season_groups, eos_tms, default=eos_tms[1])
@@ -176,7 +176,7 @@ new_df['online_weeks'] = round((new_df['calculation_date'] - new_df['publishing_
 new_df['target'] = new_df['goal_perc_st_weekly'] * new_df['online_weeks']
 # new_df['actual_st'] = new_df['net_whs_value'] / (new_df['stock_on_hand'] - new_df['net_whs_value']) *-1
 
-new_df['ideal_tm'] = np.where(new_df['protected'] == True, 0.275, 0.225)
+new_df['ideal_tm'] = np.where(new_df['protected'] == True, 0.30, 0.25)
 
 new_df['tm_margin'] = new_df['actual_gm_im'] - new_df['eos_tm']
 new_df['tm_margin week'] = new_df['tm_margin'] / ((new_df['current_eos_date'] - new_df['calculation_date']).dt.days / 7)
@@ -214,7 +214,7 @@ print(f'\nCURRENT SEASON: \n')
 current_season_groups = [(current_df['season_group'] == '3. Seasonal'), 
                          (current_df['season_group'] == '2. Seasonal no MD')]
 new_eos_st_goals = [0.85, 0.75]
-eos_tms = [-0.1, -0.02]
+eos_tms = [-0.05, 0.05]
 tm_reduction_caps = [0.1, 0.1]
 
 current_df['eos_st_goal'] = np.select(current_season_groups, new_eos_st_goals, default=np.nan)
@@ -229,7 +229,7 @@ current_df['online_weeks'] = round((current_df['calculation_date'] - current_df[
 current_df['target'] = current_df['goal_perc_st_weekly'] * current_df['online_weeks']
 # current_df['actual_st'] = current_df['net_whs_value'] / (current_df['stock_on_hand'] - current_df['net_whs_value']) *-1
 
-current_df['ideal_tm'] = np.where(current_df['protected'] == True, 0.275, 0.225)
+current_df['ideal_tm'] = np.where(current_df['protected'] == True, 0.30, 0.25)
 
 current_df['tm_margin'] = current_df['actual_gm_im'] - current_df['eos_tm']
 current_df['tm_margin week'] = current_df['tm_margin'] / ((current_df['current_eos_date'] - current_df['calculation_date']).dt.days / 7)
@@ -273,9 +273,9 @@ tm_reduction_cond = [((last_df['season_group'] == '3. Seasonal') & (last_df['act
                      ((last_df['season_group'] == '2. Seasonal no MD') & (last_df['actual_st'] < 0.4)),
                      ((last_df['season_group'] == '2. Seasonal no MD') & (last_df['actual_st'] < 0.85)),
                      ((last_df['season_group'] == '2. Seasonal no MD') & (last_df['actual_st'] <= 1))]
-reducted_tm_os = [-0.22, -0.18, -0.12, last_df['actual_gm_im'],
-                  -0.12, -0.07, -0.02, last_df['actual_gm_im']]
-max_reduction = [-0.15, -0.15, -0.15, 0,
+reducted_tm_os = [-0.15, -0.13, -0.10, last_df['actual_gm_im'],
+                  -0.07, -0.05, -0.02, last_df['actual_gm_im']]
+max_reduction = [-0.15, -0.10, -0.10, 0,
                  -0.10, -0.10, -0.10, 0]
 
 last_df['calculated_tm'] = np.select(tm_reduction_cond, reducted_tm_os, default=0)
@@ -321,8 +321,8 @@ tm_reduction_cond = [((old_df['season_group'] == '3. Seasonal') & (old_df['actua
                      ((old_df['season_group'] == '2. Seasonal no MD') & (old_df['actual_st'] <= 1))]
 reducted_tm_os = [-0.35, -0.30, -0.25, old_df['actual_gm_im'],
                   -0.25, -0.20, -0.15, old_df['actual_gm_im']]
-max_reduction = [-0.15, -0.15, -0.15, 0,
-                 -0.10, -0.10, -0.10, 0]
+max_reduction = [-0.15, -0.15, -0.10, 0,
+                 -0.15, -0.10, -0.10, 0]
 
 old_df['calculated_tm'] = np.select(tm_reduction_cond, reducted_tm_os, default=0)
 old_df['max_reduction'] = np.select(tm_reduction_cond, max_reduction, default=0)
@@ -357,8 +357,12 @@ print(f'\nCO SEASON: \n')
 
 co_df['ff_brand_cluster'] = np.where(co_df['brand'].str.lower in ['balenciaga', 'saint laurent', 'gucci', 'bottega veneta', 'max mara', 'the row'], 'reduced', 'normal')
 
-co_df['publishing_date'] = pd.to_datetime(co_df['publishing_date'], format="%Y-%m-%d")
+co_df['publishing_date'] = pd.to_datetime(co_df['publishing_date'].str[:10], format="%Y-%m-%d")
 co_df['calculation_date'] = pd.to_datetime(calc_date, format="%Y-%m-%d")
+# co_df = co_df.loc[co_df['publishing_date'] < co_df['calculation_date']]
+co_df = co_df.loc[(co_df['calculation_date'] - co_df['publishing_date']).dt.days > 14]
+
+# co_df = co_df.loc[(co_df['co_status'] != 'Existing CO') | (co_df['coverage'] > 56)]
 
 # # If the price of previous week is lower, use that one
 # co_df = pd.merge(co_df, archive_tm, how='left', left_on='sku', right_on='sku').reset_index(drop=True)
@@ -366,12 +370,8 @@ co_df['calculation_date'] = pd.to_datetime(calc_date, format="%Y-%m-%d")
 # co_df['pb_im'] = np.where(co_df['pb_im'] > co_df['pb_im_arc'], co_df['pb_im_arc'], co_df['pb_im'])
 
 # Calculations
-co_df['net_whs_value'].fillna(0, inplace=True)
-co_df['received_lm'].fillna(0, inplace=True)
-co_df['returned_lm'].fillna(0, inplace=True)
-co_df['sold_lm'].fillna(0, inplace=True)
-co_df['avg_ops_date'].fillna(0, inplace=True)
-co_df['avg_ops_date'] = pd.to_datetime(co_df['avg_ops_date'])
+co_df.fillna({'net_whs_value':0, 'received_lm':0, 'returned_lm':0, 'sold_lm':0, 'avg_ops_date':0}, inplace=True)
+co_df['avg_ops_date'] = pd.to_datetime(co_df['avg_ops_date'].str[:10])
 co_df['stock_on_hand'] = co_df['available_qty'] * co_df['eur_cost_price']
 co_df['current_eos_date'] = pd.to_datetime(current_eos_date, format="%Y-%m-%d")
 co_df['actual_gm_im'] = 1 - co_df['eur_cost_price'] / co_df['pb_im']
@@ -383,9 +383,6 @@ co_df['availability'] = (co_df['stock_qty_lm']*30 + co_df['received_lm'] * (co_d
 co_df['sales_velocity'] = co_df['sold_lm'] / co_df['availability']
 co_df['coverage'] = co_df['available_qty'] / co_df['sales_velocity'] / 7
 
-co_df = co_df.loc[co_df['publishing_date'] < co_df['calculation_date']]
-co_df = co_df.loc[(co_df['calculation_date'] - co_df['publishing_date']).dt.days > 14]
-# co_df = co_df.loc[(co_df['co_status'] != 'Existing CO') | (co_df['coverage'] > 56)]
 
 # print(co_df)
 
@@ -404,15 +401,15 @@ tm_reduction_cond_co = [(co_df['co_status'] == 'Existing CO') & (co_df['availabl
 
 reducted_tm_os_co = [0.05, 0.15, co_df['actual_gm_im'] + 0.05,
                      0.05, 0.15, co_df['actual_gm_im'] + 0.05,
-                     -0.05, 0, 
-                     -0.15, -0.1,                   
-                     -0.30, -0.20]
+                     0, 0.05, 
+                     -0.05, 0,                   
+                     -0.20, -0.15]
 
 max_reduction_co = [-0.1, -0.1, 0.05,
                     -0.1, -0.1, 0.05,
                     -0.1, -0.1,
-                    -0.15, -0.15,
-                    -0.2, -0.2]
+                    -0.1, -0.1,
+                    -0.15, -0.15]
 
 co_df['calculated_tm'] = np.select(tm_reduction_cond_co, reducted_tm_os_co, default=co_df['actual_gm_im'])
 co_df['max_reduction'] = np.select(tm_reduction_cond_co, max_reduction_co, default=0)
@@ -458,7 +455,7 @@ ab_df = ab_df.merge(promo_df, how='left', left_on='sku', right_on='sku')
 ab_df['promo_filter'] = np.where(ab_df['max_disc_b2b'] > 0, 'N', 'Y')
 
 ab_df = ab_df.loc[(ab_df['sales_filter'] == 'Y') & (ab_df['publishing_filter'] == 'Y') & (ab_df['promo_filter'] == 'Y')][['sku', 'season', 'season_group', 'eur_cost_price', 'revised_tm', 'max_reduction']].reset_index(drop=False)
-ab_df['target_cm'] = ab_df['revised_tm'] - 0.10
+ab_df['target_cm'] = ab_df['revised_tm'] - 0.05
 
 ab_df = ab_df.merge(ab_pb_df, how='left', left_on='sku', right_on='SKU')[['sku', 'season', 'season_group', 'eur_cost_price', 'revised_tm', 'max_reduction', 'target_cm', 
                                                                           '09ROW1_AB', '09ROW_AB', '09AU_AB', '09KR_AB', '09CN_AB',
@@ -486,8 +483,9 @@ print(ab_summary.head())
 ## EXCLUSIONS
 all_df = pd.concat([new_summary, current_summary, co_summary, last_summary, old_summary])
 all_df = all_df.loc[all_df['pb_im'] > 0].reset_index(drop=True)
-all_df = all_df[['sku', 'brand', 'season', 'last_season', 'season_group', 'co_status', 'pb_row1', 'pb_im', 'pb_ce', 'pb_xsln1', 'actual_gm_im', 'available_qty', 'eur_cost_price', 'stock_on_hand', 
+all_df = all_df[['sku', 'brand', 'season', 'last_season', 'season_group', 'co_status', 'private_high', 'pb_row1', 'pb_im', 'pb_ce', 'pb_xsln1', 'actual_gm_im', 'available_qty', 'eur_cost_price', 'stock_on_hand', 
                  'actual_st', 'coverage', 'max_reduction', 'revised_tm', 'tm_diff', 'new_pb_IM', 'new_pb_CE', 'new_pb_XSLN1', 'im_change', 'protected', 'online_com', 'online_im']]
+all_df = all_df.merge(promo_df[['sku', 'max_disc_b2b']], how='left', left_on='sku', right_on='sku')
 
 season_tiers = [
     (all_df['season'] == new_season) | (all_df['last_season'] == new_season),
@@ -559,6 +557,7 @@ with pd.ExcelWriter(currentlocation + '\\_RevisedTM_Summary_' + calc_date + '.xl
 print('* All products for upload')
 with pd.ExcelWriter(currentlocation + '\\_RevisedTM_Summary_All.xlsx') as writer:
     create_excel(writer, all_df, 'ALL', index=False)
+    create_excel(writer, ab_summary, 'AB', index=False)
 
 finish_time = dt.datetime.now()
 print(f'\nFinish time: {start_time}')
